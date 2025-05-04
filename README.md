@@ -16,11 +16,8 @@ try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 }
 ```
 This blocks a virtual thread, but real threads are freed up, so it's much more scalable.
-In general, although I don't have here a performance test comparison, I did it previously in another project and I came 
-to the conclusion that in fact, I do see a performance improvement with this *CompletableFuture* + blocking JDBC approach
-but it actually happens because also as it's possible to observe in the logs, the servlet threads (eg. http-nio-8080-exec-1)
-are released much quicker (as soon as the request leaves the controller) to it allows for more requests per second at the server level.
-Then it's down to the Service layer to be able to handle all those requests in parallel on the available thread pool size.
+In general, I came to the conclusion that in fact, I don't see a performance improvement with this 
+*CompletableFuture* + blocking JDBC approach.
 
 When we do use an Async Driver to interact with the database, we do also see the database calls releasing threads much quicker
 so there's no bottleneck there and that's where we do see more performance improvements and more throughput in general.
@@ -28,7 +25,9 @@ so there's no bottleneck there and that's where we do see more performance impro
 Maybe virtual threads is something to explore further in a near future, in order to work in that performance and throughput direction without using Spring Reactive Web
 
 # Performance
-- First run with 3 as Max Thread pool size using the async endpoint. We see that quite a lot of requests are failing due to time out/server rejecting new connections.
+- First run with 3 as Max Thread pool size using the async endpoint. I observed many requests failing due to the thread 
+pool becoming saturated, resulting in RejectedExecutionException when the executor could no longer accept new tasks. 
+This is a thread pool exhaustion issue, not a connection rejection at the network level.
 The errors logging to the console started around the 97 VUs and was:
 ```
 ERROR 31236 --- [asynccrudcompletablefuture] [nio-8080-exec-2] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: org.springframework.core.task.TaskRejectedException: ExecutorService in active state did not accept task: java.util.concurrent.CompletableFuture$AsyncSupply@2ced34af] with root cause
@@ -63,7 +62,7 @@ TOTAL RESULTS
 
 ```
 
-- Now a run a full blocking endpoint. After some manual tests I figured out that the servlet thread pool is 10 by default.
+- Now a run a full blocking endpoint. After reviewing the servlet container (Tomcat) configuration, I confirmed that the default servlet thread pool (maxThreads) is set to 10.
 This time around, it didn't fail any request at 97 neither 100 VUs, but I'll rerun my async version with a thread pool size of 10 so it's comparable.
 Also, as expected, the servlet thread is not released after leaving the controller so it actually uses the same thread until the request is finished.
 These were the results from the sync run and also since there's no failures the performance results are much better:
@@ -121,4 +120,158 @@ TOTAL RESULTS
     data_sent...............................................................: 3.1 MB 8.6 kB/s
 ```
 
-- All there is left to do, is to test with Spring Reactive WebFlux approach to make use of R2DBC async capabilities and check the actual performance gains.
+- To fully leverage non-blocking behavior, the next step is to test with Spring WebFlux integrated with R2DBC for database operations. 
+My current WebFlux test shows similar throughput (~*83 reqs/sec*)
+So my conclusion here is that my bottleneck here isn't just yet the limits of the CPU or Network Bandwidth, 
+it has to do with the test config that is sleeping for 1 sec after each request, so I'll remove that delay completely and test again.
+```
+TOTAL RESULTS
+
+    checks_total.......................: 29943   83.010486/s
+    checks_succeeded...................: 100.00% 29943 out of 29943
+    checks_failed......................: 0.00%   0 out of 29943
+
+    ✓ 200
+
+    HTTP
+    http_req_duration.......................................................: avg=3.68ms min=1.82ms med=3.56ms max=38.86ms p(90)=4.34ms p(95)=4.61ms
+      { expected_response:true }............................................: avg=3.68ms min=1.82ms med=3.56ms max=38.86ms p(90)=4.34ms p(95)=4.61ms
+    http_req_failed.........................................................: 0.00%  0 out of 29943
+    http_reqs...............................................................: 29943  83.010486/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=1s     min=1s     med=1s     max=1.07s   p(90)=1s     p(95)=1s
+    iterations..............................................................: 29943  83.010486/s
+    vus.....................................................................: 2      min=2          max=100
+    vus_max.................................................................: 100    min=100        max=100
+
+    NETWORK
+    data_received...........................................................: 3.2 MB 8.9 kB/s
+    data_sent...............................................................: 3.1 MB 8.6 kB/s
+```
+
+- Removing the **sleep(1)** to flood the server with as much requests as possible and investigate the results.
+Here's the results from Spring Reactive server, around *3065 reqs/sec*:
+```
+TOTAL RESULTS
+
+    checks_total.......................: 1103228 3064.688882/s
+    checks_succeeded...................: 100.00% 1103228 out of 1103228
+    checks_failed......................: 0.00%   0 out of 1103228
+
+    ✓ 200
+
+    HTTP
+    http_req_duration.......................................................: avg=27.03ms min=1.77ms med=28.93ms max=129.58ms p(90)=36.36ms p(95)=40.4ms        
+      { expected_response:true }............................................: avg=27.03ms min=1.77ms med=28.93ms max=129.58ms p(90)=36.36ms p(95)=40.4ms        
+    http_req_failed.........................................................: 0.00%   0 out of 1103228
+    http_reqs...............................................................: 1103228 3064.688882/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=27.19ms min=1.85ms med=29.08ms max=130.29ms p(90)=36.55ms p(95)=40.58ms       
+    iterations..............................................................: 1103228 3064.688882/s
+    vus.....................................................................: 1       min=1            max=100
+    vus_max.................................................................: 100     min=100          max=100
+
+    NETWORK
+    data_received...........................................................: 118 MB  328 kB/s
+    data_sent...............................................................: 115 MB  319 kB/s
+```
+
+Here's the results for the Sync approach with Tomcat Server with a much lower result of around *2495 reqs/sec*, around 19% less. 
+Also, it's possible to observe that quite a couple of requests failed due to timeout right at the start of the performance test and then it recovered and stayed stable until the end:
+```
+TOTAL RESULTS
+
+    checks_total.......................: 964376 2495.349349/s
+    checks_succeeded...................: 99.93% 963751 out of 964376
+    checks_failed......................: 0.06%  625 out of 964376
+
+    ✗ 200
+      ↳  99% — ✓ 963751 / ✗ 625
+
+    HTTP
+    http_req_duration.......................................................: avg=10.42ms min=0s     med=8.51ms max=123.61ms p(90)=20.18ms p(95)=23.7ms
+      { expected_response:true }............................................: avg=10.43ms min=57µs   med=8.52ms max=123.61ms p(90)=20.18ms p(95)=23.7ms
+    http_req_failed.........................................................: 0.06%  625 out of 964376
+    http_reqs...............................................................: 964376 2495.349349/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=31.84ms min=1.48ms med=8.71ms max=30s      p(90)=20.44ms p(95)=24.03ms
+    iterations..............................................................: 964376 2495.349349/s
+    vus.....................................................................: 1      min=1             max=100
+    vus_max.................................................................: 100    min=100           max=100
+
+    NETWORK
+    data_received...........................................................: 155 MB 402 kB/s
+    data_sent...............................................................: 100 MB 259 kB/s
+```
+
+Here's the results for the Tomcat server with Async approach and max thread pool size of 10. 
+We can state that 10 threads in the pool is way too less and therefore quite a lot of requests fail.
+```
+TOTAL RESULTS
+
+    checks_total.......................: 34811  91.041487/s
+    checks_succeeded...................: 55.14% 19197 out of 34811
+    checks_failed......................: 44.85% 15614 out of 34811
+
+    ✗ 200
+      ↳  55% — ✓ 19197 / ✗ 15614
+
+    HTTP
+    http_req_duration.......................................................: avg=12.85ms  min=0s     med=3.23ms max=30.77s  p(90)=7.09ms p(95)=8.31ms
+      { expected_response:true }............................................: avg=4.73ms   min=1.86ms med=4.25ms max=29.74ms p(90)=7.54ms p(95)=8.58ms
+    http_req_failed.........................................................: 44.85% 15614 out of 34811
+    http_reqs...............................................................: 34811  91.041487/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=907.21ms min=1.94ms med=4.26ms max=30.77s  p(90)=9.6ms  p(95)=14.38ms
+    iterations..............................................................: 34811  91.041487/s
+    vus.....................................................................: 2      min=2              max=100
+    vus_max.................................................................: 100    min=100            max=100
+
+    NETWORK
+    data_received...........................................................: 7.0 MB 18 kB/s
+    data_sent...............................................................: 3.5 MB 9.2 kB/s
+```
+
+Here's the results for the Tomcat server with Async approach and max thread pool size of 100. 
+It's possible to see that fewer requests are failing (same number as sync) and we're ranging *2499 reqs/sec* which is 
+basically the same number of requests that the sync approach made.
+```
+TOTAL RESULTS
+
+    checks_total.......................: 906457 2498.835623/s
+    checks_succeeded...................: 99.95% 906032 out of 906457
+    checks_failed......................: 0.04%  425 out of 906457
+
+    ✗ 200
+      ↳  99% — ✓ 906032 / ✗ 425
+
+    HTTP
+    http_req_duration.......................................................: avg=17.71ms min=0s       med=16ms    max=194.15ms p(90)=32.34ms p(95)=36.89ms
+      { expected_response:true }............................................: avg=17.71ms min=966.45µs med=16.01ms max=194.15ms p(90)=32.34ms p(95)=36.9ms
+    http_req_failed.........................................................: 0.04%  425 out of 906457
+    http_reqs...............................................................: 906457 2498.835623/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=34.03ms min=1.87ms   med=16.2ms  max=30.01s   p(90)=32.61ms p(95)=37.23ms
+    iterations..............................................................: 906457 2498.835623/s
+    vus.....................................................................: 5      min=2             max=100
+    vus_max.................................................................: 100    min=100           max=100
+
+    NETWORK
+    data_received...........................................................: 146 MB 403 kB/s
+    data_sent...............................................................: 94 MB  260 kB/s
+```
+
+# Conclusions
+At this point, my conclusion is that more available threads in the thread pool make the Tomcat server handle more 
+requests but since I'm using JDBC when interacting with the database the thread is blocked, and therefore I'm limited to 
+how fast that blocking operation completes so the results when using completely Sync operations and using Async with CompletableFuture 
+everywhere doesn't make a difference in performance, but it does make the program more complex. 
+Maybe that approach really shines when using for example *WebClient* for http calls, but then we must account for Race Conditions 
+and maybe also use Concurrent Collections or synchronized blocks since most likely we will need the result from that http request to proceed so at the end of the day the request might still have that bottleneck.
+When going with a Netty server provided with Spring Reactive Project (WebFlux), we're able to handle much more requests/second, 
+and we also use R2DBC driver enabling async communication with the database and better managed Thread releases. As a bonus we also have access to the HTTP 2.0 server.
