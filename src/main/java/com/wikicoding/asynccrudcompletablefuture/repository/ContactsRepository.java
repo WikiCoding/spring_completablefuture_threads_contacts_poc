@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 
 @Repository
 public interface ContactsRepository extends JpaRepository<Contact, Integer> {
+//    Optional<Contact> findByEmail(String email);
     @Async
     CompletableFuture<Optional<Contact>> findByEmail(String email);
 }

@@ -11,6 +11,7 @@ import java.util.concurrent.Executor;
 @SpringBootApplication
 @EnableAsync
 public class AsynccrudcompletablefutureApplication {
+    private static final int threadCount = 10;
 
     public static void main(String[] args) {
         SpringApplication.run(AsynccrudcompletablefutureApplication.class, args);
@@ -19,9 +20,9 @@ public class AsynccrudcompletablefutureApplication {
     @Bean
     public Executor asyncExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);
-        executor.setMaxPoolSize(3);
-        executor.setQueueCapacity(3);
+        executor.setCorePoolSize(threadCount);
+        executor.setMaxPoolSize(threadCount);
+        executor.setQueueCapacity(threadCount);
         executor.setThreadNamePrefix("Async-");
         executor.initialize();
         return executor;

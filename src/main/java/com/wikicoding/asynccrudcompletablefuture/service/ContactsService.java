@@ -61,4 +61,9 @@ public class ContactsService {
                     });
                 });
     }
+
+//    public Optional<Contact> findByEmailSync(String email) {
+//        log.warn("Service running the find sync on thread {}", Thread.currentThread().getName());
+//        return contactsRepository.findByEmail(email);
+//    }
 }

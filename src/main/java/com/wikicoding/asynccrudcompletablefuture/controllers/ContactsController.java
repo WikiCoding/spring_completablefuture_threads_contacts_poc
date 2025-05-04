@@ -65,4 +65,14 @@ public class ContactsController {
                     return ResponseEntity.badRequest().build();
                 });
     }
+
+//    @GetMapping("/{email}")
+//    public ResponseEntity<Object> findByEmailSync(@PathVariable(name = "email") String email) {
+//        log.warn("Controller endpoint running on thread {}", Thread.currentThread().getName());
+//
+//        if (email.trim().isEmpty())
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email has to be valid");
+//
+//        return ResponseEntity.ok(contactsService.findByEmailSync(email));
+//    }
 }
