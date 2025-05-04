@@ -266,6 +266,60 @@ TOTAL RESULTS
     data_sent...............................................................: 94 MB  260 kB/s
 ```
 
+- Now running the Spring Reactive WebFlux at 500 VUs without sleep
+```
+TOTAL RESULTS
+
+    checks_total.......................: 1057655 2938.111333/s
+    checks_succeeded...................: 100.00% 1057655 out of 1057655
+    checks_failed......................: 0.00%   0 out of 1057655
+
+    ✓ 200
+
+    HTTP
+    http_req_duration.......................................................: avg=141.67ms min=2.36ms med=151.98ms max=551.73ms p(90)=191.05ms p(95)=208.2ms
+      { expected_response:true }............................................: avg=141.67ms min=2.36ms med=151.98ms max=551.73ms p(90)=191.05ms p(95)=208.2ms
+    http_req_failed.........................................................: 0.00%   0 out of 1057655
+    http_reqs...............................................................: 1057655 2938.111333/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=141.85ms min=2.47ms med=152.15ms max=551.79ms p(90)=191.21ms p(95)=208.33ms
+    iterations..............................................................: 1057655 2938.111333/s
+    vus.....................................................................: 1       min=1            max=500
+    vus_max.................................................................: 500     min=500          max=500
+
+    NETWORK
+    data_received...........................................................: 114 MB  317 kB/s
+    data_sent...............................................................: 110 MB  306 kB/s
+```
+
+- Now running the Spring Reactive WebFlux at 5000 VUs without sleep
+```
+TOTAL RESULTS
+
+    checks_total.......................: 1053590 2926.975107/s
+    checks_succeeded...................: 100.00% 1053590 out of 1053590
+    checks_failed......................: 0.00%   0 out of 1053590
+
+    ✓ 200
+
+    HTTP
+    http_req_duration.......................................................: avg=1.42s min=2.6ms  med=1.6s max=2.13s p(90)=1.86s p(95)=1.91s
+      { expected_response:true }............................................: avg=1.42s min=2.6ms  med=1.6s max=2.13s p(90)=1.86s p(95)=1.91s
+    http_req_failed.........................................................: 0.00%   0 out of 1053590
+    http_reqs...............................................................: 1053590 2926.975107/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=1.42s min=2.72ms med=1.6s max=2.13s p(90)=1.86s p(95)=1.91s
+    iterations..............................................................: 1053590 2926.975107/s
+    vus.....................................................................: 48      min=37           max=5000
+    vus_max.................................................................: 5000    min=5000         max=5000
+
+    NETWORK
+    data_received...........................................................: 114 MB  316 kB/s
+    data_sent...............................................................: 110 MB  304 kB/s
+```
+
 # Conclusions
 At this point, my conclusion is that more available threads in the thread pool make the Tomcat server handle more 
 requests but since I'm using JDBC when interacting with the database the thread is blocked, and therefore I'm limited to 
