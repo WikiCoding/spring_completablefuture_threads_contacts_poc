@@ -329,3 +329,60 @@ Maybe that approach really shines when using for example *WebClient* for http ca
 and maybe also use Concurrent Collections or synchronized blocks since most likely we will need the result from that http request to proceed so at the end of the day the request might still have that bottleneck.
 When going with a Netty server provided with Spring Reactive Project (WebFlux), we're able to handle much more requests/second, 
 and we also use R2DBC driver enabling async communication with the database and better managed Thread releases. As a bonus we also have access to the HTTP 2.0 server.
+
+# Bonus
+1. Results of equivalent .NET8 application using EF Core with sleep(1)
+```
+TOTAL RESULTS
+
+    checks_total.......................: 27393   76.049236/s
+    checks_succeeded...................: 100.00% 27393 out of 27393
+    checks_failed......................: 0.00%   0 out of 27393
+
+    ✓ 200
+
+    HTTP
+    http_req_duration.......................................................: avg=97.44ms min=8.56ms med=89.38ms max=1.04s p(90)=167.43ms p(95)=220.35ms
+      { expected_response:true }............................................: avg=97.44ms min=8.56ms med=89.38ms max=1.04s p(90)=167.43ms p(95)=220.35ms
+    http_req_failed.........................................................: 0.00%  0 out of 27393
+    http_reqs...............................................................: 27393  76.049236/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=1.09s   min=1s     med=1.09s   max=2.04s p(90)=1.16s    p(95)=1.22s
+    iterations..............................................................: 27393  76.049236/s
+    vus.....................................................................: 1      min=1          max=100
+    vus_max.................................................................: 100    min=100        max=100
+
+    NETWORK
+    data_received...........................................................: 5.4 MB 15 kB/s
+    data_sent...............................................................: 3.1 MB 8.5 kB/s
+```
+2. Now the results without sleep(1)
+```
+ TOTAL RESULTS
+
+    checks_total.......................: 26902  74.728867/s
+    checks_succeeded...................: 99.78% 26845 out of 26902
+    checks_failed......................: 0.21%  57 out of 26902
+
+    ✗ 200
+      ↳  99% — ✓ 26845 / ✗ 57
+
+    HTTP
+    http_req_duration.......................................................: avg=1.11s    min=16.28ms med=920.2ms  max=59.99s p(90)=1.55s p(95)=2.02s
+      { expected_response:true }............................................: avg=994.09ms min=16.28ms med=918.99ms max=49.03s p(90)=1.53s p(95)=1.97s
+    http_req_failed.........................................................: 0.21%  57 out of 26902
+    http_reqs...............................................................: 26902  74.728867/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=1.11s    min=16.39ms med=920.29ms max=1m0s   p(90)=1.55s p(95)=2.02s
+    iterations..............................................................: 26902  74.728867/s
+    vus.....................................................................: 1      min=1           max=100
+    vus_max.................................................................: 100    min=100         max=100
+
+    NETWORK
+    data_received...........................................................: 5.3 MB 15 kB/s
+    data_sent...............................................................: 3.0 MB 8.4 kB/s
+```
+With these results it looks like .NET is falling behind Spring framework and the difference is quite big. Even for each http_request the median for Spring is around 3.23ms and with .NET is going as slow as 89.38ms
+Then Spring blocking api was able to handle 83.027reqs/sec with 100VUs and sleep(1) without errors while the Async api from .NET handled 76.05reqs/sec without errors in the same conditions.

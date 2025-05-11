@@ -1,0 +1,9 @@
+services:
+  psql:
+    image: postgres
+    ports:
+      - "5555:5432"
+    environment:
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: contacts-db
