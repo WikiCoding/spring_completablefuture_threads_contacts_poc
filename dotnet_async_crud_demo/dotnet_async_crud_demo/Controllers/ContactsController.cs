@@ -1,6 +1,7 @@
 ﻿using dotnet_async_crud_demo.dtos;
 using dotnet_async_crud_demo.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 
 namespace dotnet_async_crud_demo.Controllers;
 
@@ -26,6 +27,9 @@ public class ContactsController(ContactsService service, ILogger<ContactsControl
     [HttpGet("{email}")]
     public async Task<IActionResult> findByEmail([FromRoute(Name = "email")] string email)
     {
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
+
         logger.LogWarning("Controller endpoint running on thread {}", Thread.CurrentThread.ManagedThreadId);
 
         if (string.IsNullOrEmpty(email))
@@ -39,6 +43,10 @@ public class ContactsController(ContactsService service, ILogger<ContactsControl
         {
             return NotFound("Contact not found by email");
         }
+
+        stopwatch.Stop();
+
+        logger.LogWarning("Request took {}ms and now is on thread {}", stopwatch.ElapsedMilliseconds, Thread.CurrentThread.ManagedThreadId);
 
         return Ok(contact);
     }

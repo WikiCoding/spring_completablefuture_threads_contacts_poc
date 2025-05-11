@@ -386,3 +386,31 @@ TOTAL RESULTS
 ```
 With these results it looks like .NET is falling behind Spring framework and the difference is quite big. Even for each http_request the median for Spring is around 3.23ms and with .NET is going as slow as 89.38ms
 Then Spring blocking api was able to handle 83.027reqs/sec with 100VUs and sleep(1) without errors while the Async api from .NET handled 76.05reqs/sec without errors in the same conditions.
+Since for all the previous tests I was using EF Core and it's not know to have the best performance, changed to Npgsql low level API with raw SQL queries. These were the results:
+```
+ TOTAL RESULTS
+
+    checks_total.......................: 26533   73.500947/s
+    checks_succeeded...................: 100.00% 26533 out of 26533
+    checks_failed......................: 0.00%   0 out of 26533
+
+    ✓ 200
+
+    HTTP
+    http_req_duration.......................................................: avg=133.08ms min=9.29ms med=91.98ms max=7.21s p(90)=198.98ms p(95)=326.2ms
+      { expected_response:true }............................................: avg=133.08ms min=9.29ms med=91.98ms max=7.21s p(90)=198.98ms p(95)=326.2ms
+    http_req_failed.........................................................: 0.00%  0 out of 26533
+    http_reqs...............................................................: 26533  73.500947/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=1.13s    min=1s     med=1.09s   max=8.21s p(90)=1.19s    p(95)=1.32s
+    iterations..............................................................: 26533  73.500947/s
+    vus.....................................................................: 1      min=1          max=100
+    vus_max.................................................................: 100    min=100        max=100
+
+    NETWORK
+    data_received...........................................................: 5.2 MB 14 kB/s
+    data_sent...............................................................: 3.0 MB 8.2 kB/s
+```
+So roughly the same number of requests/sec comparing to the EF Core but more stable since there aren't any requests failed.
+![img.png](img.png)
