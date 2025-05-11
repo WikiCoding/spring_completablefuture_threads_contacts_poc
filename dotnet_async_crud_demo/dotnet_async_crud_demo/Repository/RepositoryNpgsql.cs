@@ -17,7 +17,7 @@ public class RepositoryNpgsql
 
     public async Task<Contact> SaveAsync(Contact contact)
     {
-        await using (var cmd = dataSource.CreateCommand($"INSERT INTO \"{table}\" (Name, Email) VALUES (@name, @email)"))
+        await using (var cmd = dataSource.CreateCommand($"INSERT INTO \"{table}\" (\"Name\", \"Email\") VALUES (@name, @email)"))
         {
             cmd.Parameters.AddWithValue("@name", contact.Name);
             cmd.Parameters.AddWithValue("@email", contact.Email);
